@@ -62,14 +62,18 @@ export const extractEvolutionNames = (chain: any, evolutionSet: Set<string>) => 
   }
 };
 
+
+let currentGetPokemonsBySearchId = 0;
 export const getPokemonsBySearch = async (search: string) => {
+  const getPokemonsBySearchId = ++currentGetPokemonsBySearchId;
+
   let data: Pokemon[] = [];
   let hasNext = true;
   const limit = 100;
   let offset = 0;
   const evolutionSet = new Set<string>();
 
-  do {
+  while (hasNext && getPokemonsBySearchId === currentGetPokemonsBySearchId) {
     const response = await apiClient.get(`/pokemon-species?limit=${limit}&offset=${offset}`);
     offset += limit;
     hasNext = response?.data?.next;
@@ -79,13 +83,15 @@ export const getPokemonsBySearch = async (search: string) => {
     ) ?? [];
 
     for (const pokemon of filteredPokemons) {
+      if (getPokemonsBySearchId !== currentGetPokemonsBySearchId) break;
       const speciesData = await getPokemonSpecies(pokemon.name);
       const evolutionChainData = await getEvolutionChain(speciesData.evolution_chain.url);
       extractEvolutionNames(evolutionChainData.chain, evolutionSet);
     }
-  } while(hasNext);
+  }
 
-  return Array.from(evolutionSet).map(name => ({ name }));
+  if (getPokemonsBySearchId == currentGetPokemonsBySearchId) return Array.from(evolutionSet).map(name => ({ name }));
+  else return [];
 };
 
 export const getPokemonDetail = async (name: string) => {
